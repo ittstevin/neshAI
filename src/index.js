@@ -4,6 +4,7 @@ const QRCode = require('qrcode');
 const fetch = require('node-fetch');
 const fs = require('fs');
 const path = require('path');
+const { formatPromptForModel, getModelParameters } = require('./custom-model-config');
 require('dotenv').config();
 
 // Start the Express server
@@ -332,7 +333,7 @@ async function tryAIResponse(message) {
       
       // Prepare context for better responses
       const context = FULL_AI_MODE 
-        ? `You are NeshBot, a friendly and helpful AI assistant. Be conversational, engaging, and helpful. Keep responses concise but friendly. User message: ${userMessage}`
+        ? formatPromptForModel(AI_MODEL, userMessage)
         : userMessage;
       
       const response = await fetch(modelUrl, {
@@ -343,11 +344,7 @@ async function tryAIResponse(message) {
         },
         body: JSON.stringify({
           inputs: context,
-          parameters: {
-            max_length: FULL_AI_MODE ? 200 : 150,
-            temperature: 0.7,
-            do_sample: true
-          }
+          parameters: getModelParameters(AI_MODEL)
         })
       });
       
