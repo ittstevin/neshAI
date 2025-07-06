@@ -1,6 +1,9 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
+const QRCode = require('qrcode');
 const fetch = require('node-fetch');
+const fs = require('fs');
+const path = require('path');
 require('dotenv').config();
 
 // Start the Express server
@@ -42,15 +45,47 @@ const client = new Client({
   }
 });
 
+// Store QR code data globally
+global.currentQRCode = null;
+
 // Generate QR code for WhatsApp Web
-client.on('qr', (qr) => {
+client.on('qr', async (qr) => {
   console.log('QR RECEIVED', qr);
+  
+  // Store QR code data
+  global.currentQRCode = qr;
+  
+  // Generate terminal QR code
   qrcode.generate(qr, { small: true });
+  
+  // Generate QR code image for local development
+  try {
+    const qrImagePath = path.join(__dirname, '..', 'whatsapp-qr.png');
+    await QRCode.toFile(qrImagePath, qr, {
+      color: {
+        dark: '#000000',
+        light: '#FFFFFF'
+      },
+      width: 400,
+      margin: 2
+    });
+    
+    console.log('\n📱 QR Code saved as: whatsapp-qr.png');
+    console.log('📂 Full path:', qrImagePath);
+    console.log('🔗 You can also open this file in your browser to scan!');
+    
+  } catch (error) {
+    console.error('Error generating QR image:', error);
+  }
+  
+  console.log('\n🌐 QR Code also available at: http://localhost:3000/qr');
+  console.log('🚂 When deployed to Railway, visit: https://your-app.railway.app/qr');
 });
 
 client.on('ready', () => {
   console.log('Client is ready!');
   console.log(`🤖 ${BOT_CONFIG.name} is now online!`);
+  global.currentQRCode = null; // Clear QR code when connected
 });
 
 // Handle incoming messages
