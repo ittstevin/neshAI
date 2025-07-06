@@ -18,6 +18,10 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const COHERE_API_KEY = process.env.COHERE_API_KEY;
 const AI21_API_KEY = process.env.AI21_API_KEY;
 
+// Bot mode configuration
+const FULL_AI_MODE = process.env.FULL_AI_MODE === 'true';
+const AI_MODEL = process.env.AI_MODEL || 'facebook/blenderbot-400M-distill';
+
 // Bot configuration
 const BOT_CONFIG = {
   name: process.env.BOT_NAME || "Nesh's lil auto-bot",
@@ -174,13 +178,36 @@ async function handleMessage(message) {
     return;
   }
   
+  // Bot control commands
+  if (userMessage.includes('switch to ai mode') || userMessage.includes('enable full ai')) {
+    await message.reply('🤖 Switching to Full AI mode! I\'ll now try to respond to everything with AI first. Set FULL_AI_MODE=true in Railway to make this permanent!');
+    return;
+  }
+  
+  if (userMessage.includes('switch to normal mode') || userMessage.includes('disable full ai')) {
+    await message.reply('🎮 Switching to Normal mode! I\'ll use entertainment features first, then AI as backup. Set FULL_AI_MODE=false in Railway to make this permanent!');
+    return;
+  }
+  
   // AI-powered responses
   if (userMessage.includes('ai') || userMessage.includes('chatgpt') || userMessage.includes('smart')) {
     await sendAIResponse(message);
     return;
   }
   
-  // Try AI response first, then fallback
+  // Full AI mode: Try AI first for everything
+  if (FULL_AI_MODE) {
+    const aiResponse = await tryAIResponse(message);
+    if (aiResponse) {
+      await message.reply(aiResponse);
+      return;
+    }
+    // If AI fails, fall back to entertainment
+    await sendDefaultResponse(message);
+    return;
+  }
+  
+  // Regular mode: Try AI for unknown requests, then fallback
   const aiResponse = await tryAIResponse(message);
   if (aiResponse) {
     await message.reply(aiResponse);
@@ -298,17 +325,29 @@ async function sendRandomAdvice(message) {
 async function tryAIResponse(message) {
   const userMessage = message.body;
   
-  // Try Hugging Face first
+  // Try Hugging Face with configurable model
   if (HUGGINGFACE_API_KEY) {
     try {
-      const response = await fetch(HUGGINGFACE_API_URL, {
+      const modelUrl = `https://api-inference.huggingface.co/models/${AI_MODEL}`;
+      
+      // Prepare context for better responses
+      const context = FULL_AI_MODE 
+        ? `You are NeshBot, a friendly and helpful AI assistant. Be conversational, engaging, and helpful. Keep responses concise but friendly. User message: ${userMessage}`
+        : userMessage;
+      
+      const response = await fetch(modelUrl, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${HUGGINGFACE_API_KEY}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          inputs: userMessage
+          inputs: context,
+          parameters: {
+            max_length: FULL_AI_MODE ? 200 : 150,
+            temperature: 0.7,
+            do_sample: true
+          }
         })
       });
       
@@ -317,10 +356,12 @@ async function tryAIResponse(message) {
         let aiResponse = data[0]?.generated_text || null;
         
         if (aiResponse) {
-          if (aiResponse.length > 300) {
-            aiResponse = aiResponse.substring(0, 300) + '...';
+          // Clean up the response
+          aiResponse = aiResponse.replace(/^[^a-zA-Z]*/, ''); // Remove leading non-letters
+          if (aiResponse.length > (FULL_AI_MODE ? 400 : 300)) {
+            aiResponse = aiResponse.substring(0, FULL_AI_MODE ? 400 : 300) + '...';
           }
-          return `🧠 ${aiResponse}`;
+          return `${FULL_AI_MODE ? '🤖' : '🧠'} ${aiResponse}`;
         }
       }
     } catch (error) {
