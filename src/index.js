@@ -27,7 +27,7 @@ const BOT_CONFIG = {
   ]
 };
 
-// Initialize WhatsApp client
+// Initialize WhatsApp client with better options
 const client = new Client({
   authStrategy: new LocalAuth(),
   puppeteer: {
@@ -40,8 +40,11 @@ const client = new Client({
       '--no-first-run',
       '--no-zygote',
       '--single-process',
-      '--disable-gpu'
-    ]
+      '--disable-gpu',
+      '--disable-web-security',
+      '--disable-features=VizDisplayCompositor'
+    ],
+    timeout: 60000
   }
 });
 
