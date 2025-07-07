@@ -1,27 +1,19 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const QRCode = require('qrcode');
-const fetch = require('node-fetch');
 const fs = require('fs');
 const path = require('path');
-const { formatPromptForModel, getModelParameters } = require('./custom-model-config');
+const LocalAIModel = require('./local-ai-model');
 require('dotenv').config();
 
 // Start the Express server
 require('./server');
 
-// AI API configurations
-const HUGGINGFACE_API_KEY = process.env.HUGGINGFACE_API_KEY;
-const HUGGINGFACE_API_URL = 'https://api-inference.huggingface.co/models/facebook/blenderbot-400M-distill';
-
-// Alternative free AI APIs
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const COHERE_API_KEY = process.env.COHERE_API_KEY;
-const AI21_API_KEY = process.env.AI21_API_KEY;
+// Local AI Model configuration
+const localAIModel = new LocalAIModel();
 
 // Bot mode configuration
 const FULL_AI_MODE = process.env.FULL_AI_MODE === 'true';
-const AI_MODEL = process.env.AI_MODEL || 'facebook/blenderbot-400M-distill';
 
 // Bot configuration
 const BOT_CONFIG = {
@@ -50,7 +42,9 @@ const BOT_CONFIG = {
 
 // Initialize WhatsApp client with better options
 const client = new Client({
-  authStrategy: new LocalAuth(),
+  authStrategy: new LocalAuth({
+    clientId: 'main-bot-' + Date.now() // Force new session for reliability
+  }),
   puppeteer: {
     headless: true,
     args: [
@@ -63,7 +57,8 @@ const client = new Client({
       '--single-process',
       '--disable-gpu',
       '--disable-web-security',
-      '--disable-features=VizDisplayCompositor'
+      '--disable-features=VizDisplayCompositor',
+      '--disable-blink-features=AutomationControlled'
     ],
     timeout: 60000
   }
@@ -107,41 +102,83 @@ client.on('qr', async (qr) => {
 });
 
 client.on('ready', () => {
-  console.log('Client is ready!');
+  console.log('✅ Client is ready!');
   console.log(`🤖 ${BOT_CONFIG.name} is now online!`);
   global.currentQRCode = null; // Clear QR code when connected
 });
 
+client.on('authenticated', () => {
+  console.log('🔐 Client is authenticated!');
+});
+
+client.on('auth_failure', (msg) => {
+  console.error('❌ Authentication failed:', msg);
+});
+
+client.on('disconnected', (reason) => {
+  console.log('🔌 Client was disconnected:', reason);
+});
+
+client.on('loading_screen', (percent, message) => {
+  console.log(`📱 Loading: ${percent}% - ${message}`);
+});
+
 // Handle incoming messages
 client.on('message', async (message) => {
-  if (message.from === 'status@broadcast') return; // Ignore status updates
+  console.log('🔔 Message event triggered!');
+  console.log(`📨 Message details:`, {
+    from: message.from,
+    body: message.body,
+    type: message.type,
+    timestamp: message.timestamp
+  });
+  
+  if (message.from === 'status@broadcast') {
+    console.log('🚫 Ignoring status broadcast message');
+    return; // Ignore status updates
+  }
   
   console.log(`📨 New message from ${message.from}: ${message.body}`);
   
   try {
     await handleMessage(message);
   } catch (error) {
-    console.error('Error handling message:', error);
-    await message.reply('Sorry, something went wrong! 😅');
+    console.error('❌ Error handling message:', error);
+    try {
+      await message.reply('Sorry, something went wrong! 😅');
+    } catch (replyError) {
+      console.error('❌ Error sending error reply:', replyError);
+    }
   }
 });
 
 async function handleMessage(message) {
+  console.log('🧠 Starting message handling...');
+  
   const userMessage = message.body.toLowerCase().trim();
+  console.log(`📝 Processing message: "${userMessage}"`);
+  
+  // Simple test response first
+  if (userMessage === 'test' || userMessage === 'ping') {
+    console.log('🧪 Sending test response...');
+    await message.reply('Pong! 🏓 Bot is working!');
+    return;
+  }
   
   // Check if this is a first-time conversation
   const chat = await message.getChat();
   const isFirstMessage = !chat.lastMessage || chat.lastMessage.fromMe;
   
+  if (isFirstMessage) {
+    console.log('👋 Sending welcome message...');
+    await sendWelcomeMessage(message);
+    return;
+  }
+  
   // Check for various greetings
   const isGreeting = BOT_CONFIG.greetings.some(greeting => 
     userMessage.includes(greeting)
   );
-  
-  if (isFirstMessage || isGreeting) {
-    await sendWelcomeMessage(message);
-    return;
-  }
   
   // Handle entertainment options
   if (userMessage.includes('joke') || userMessage.includes('tell me a joke')) {
@@ -181,17 +218,17 @@ async function handleMessage(message) {
   
   // Bot control commands
   if (userMessage.includes('switch to ai mode') || userMessage.includes('enable full ai')) {
-    await message.reply('🤖 Switching to Full AI mode! I\'ll now try to respond to everything with AI first. Set FULL_AI_MODE=true in Railway to make this permanent!');
+    await message.reply('🤖 Switching to Full AI mode! I\'ll now try to respond to everything with my local AI first. Set FULL_AI_MODE=true in Railway to make this permanent!');
     return;
   }
   
   if (userMessage.includes('switch to normal mode') || userMessage.includes('disable full ai')) {
-    await message.reply('🎮 Switching to Normal mode! I\'ll use entertainment features first, then AI as backup. Set FULL_AI_MODE=false in Railway to make this permanent!');
+    await message.reply('🎮 Switching to Normal mode! I\'ll use entertainment features first, then my local AI as backup. Set FULL_AI_MODE=false in Railway to make this permanent!');
     return;
   }
   
   // AI-powered responses
-  if (userMessage.includes('ai') || userMessage.includes('chatgpt') || userMessage.includes('smart')) {
+  if (userMessage.includes('ai') || userMessage.includes('smart') || userMessage.includes('intelligent')) {
     await sendAIResponse(message);
     return;
   }
@@ -325,113 +362,19 @@ async function sendRandomAdvice(message) {
 
 async function tryAIResponse(message) {
   const userMessage = message.body;
+  const userId = message.from;
   
-  // Try Hugging Face with configurable model
-  if (HUGGINGFACE_API_KEY) {
-    try {
-      const modelUrl = `https://api-inference.huggingface.co/models/${AI_MODEL}`;
-      
-      // Prepare context for better responses
-      const context = FULL_AI_MODE 
-        ? formatPromptForModel(AI_MODEL, userMessage)
-        : userMessage;
-      
-      const response = await fetch(modelUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${HUGGINGFACE_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          inputs: context,
-          parameters: getModelParameters(AI_MODEL)
-        })
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        let aiResponse = data[0]?.generated_text || null;
-        
-        if (aiResponse) {
-          // Clean up the response
-          aiResponse = aiResponse.replace(/^[^a-zA-Z]*/, ''); // Remove leading non-letters
-          if (aiResponse.length > (FULL_AI_MODE ? 400 : 300)) {
-            aiResponse = aiResponse.substring(0, FULL_AI_MODE ? 400 : 300) + '...';
-          }
-          return `${FULL_AI_MODE ? '🤖' : '🧠'} ${aiResponse}`;
-        }
-      }
-    } catch (error) {
-      console.error('Hugging Face API Error:', error);
+  try {
+    // Use local AI model to generate response
+    const aiResponse = await localAIModel.generateResponse(userMessage, userId);
+    
+    if (aiResponse) {
+      // Add AI indicator based on mode
+      const prefix = FULL_AI_MODE ? '🤖' : '🧠';
+      return `${prefix} ${aiResponse}`;
     }
-  }
-  
-  // Try OpenAI if available
-  if (OPENAI_API_KEY) {
-    try {
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${OPENAI_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
-          messages: [
-            {
-              role: 'system',
-              content: 'You are a helpful, friendly AI assistant. Keep responses concise and engaging.'
-            },
-            {
-              role: 'user',
-              content: userMessage
-            }
-          ],
-          max_tokens: 150
-        })
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        const aiResponse = data.choices?.[0]?.message?.content;
-        
-        if (aiResponse) {
-          return `🤖 ${aiResponse}`;
-        }
-      }
-    } catch (error) {
-      console.error('OpenAI API Error:', error);
-    }
-  }
-  
-  // Try Cohere if available
-  if (COHERE_API_KEY) {
-    try {
-      const response = await fetch('https://api.cohere.ai/v1/generate', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${COHERE_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'command',
-          prompt: userMessage,
-          max_tokens: 150,
-          temperature: 0.7
-        })
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        const aiResponse = data.generations?.[0]?.text;
-        
-        if (aiResponse) {
-          return `💭 ${aiResponse.trim()}`;
-        }
-      }
-    } catch (error) {
-      console.error('Cohere API Error:', error);
-    }
+  } catch (error) {
+    console.error('Local AI Model Error:', error);
   }
   
   return null; // Fall back to default response
@@ -442,7 +385,7 @@ async function sendAIResponse(message) {
   if (aiResponse) {
     await message.reply(aiResponse);
   } else {
-    await message.reply("Sorry! I'm having trouble connecting to my brain right now. Maybe try one of the other options? 😅");
+    await message.reply("Sorry! I'm having trouble with my local AI brain right now. Maybe try one of the other options? 😅");
   }
 }
 

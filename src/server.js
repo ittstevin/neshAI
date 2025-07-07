@@ -23,13 +23,15 @@ app.get('/health', (req, res) => {
 app.get('/', (req, res) => {
   res.json({
     message: 'Welcome to NeshBot! 🤖',
-    description: 'A WhatsApp bot with AI-powered responses',
+    description: 'A WhatsApp bot with Local AI-powered responses',
     status: 'running',
     features: [
       'WhatsApp integration',
-      'AI-powered responses (Hugging Face)',
+      'Local AI-powered responses (No API needed)',
       'Entertainment options',
-      'Jokes, stories, and fun facts'
+      'Jokes, stories, and fun facts',
+      'Pattern matching and knowledge base',
+      'Conversation context awareness'
     ]
   });
 });
@@ -39,7 +41,8 @@ app.get('/status', (req, res) => {
   res.json({
     botName: process.env.BOT_NAME || "Nesh's lil auto-bot",
     owner: process.env.BOT_OWNER || "Nesh",
-    aiEnabled: !!process.env.HUGGINGFACE_API_KEY,
+    aiEnabled: true, // Local AI is always enabled
+    aiType: "Local AI Model",
     uptime: process.uptime(),
     timestamp: new Date().toISOString()
   });
