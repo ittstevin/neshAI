@@ -16,23 +16,23 @@ class LocalAIModel {
   initializeKnowledgeBase() {
     // General conversation patterns
     this.addResponsePattern('greeting', [
-      'hello', 'hi', 'hey', 'sup', 'whats up', 'good morning', 'good afternoon', 'good evening'
+      'hello', 'hi', 'hey', 'sup', 'whats up', 'good morning', 'good afternoon', 'good evening', 'yo', 'niaje'
     ], [
-      "Hey there! 👋 How's it going?",
-      "Hi! Nice to chat with you! 😊",
-      "Hello! What's on your mind today?",
-      "Hey! How can I help you out?",
-      "Hi there! Ready for a great conversation! ✨"
+      "Hey there! I'm Tevin's digital sidekick 🤖✨ What can I do for you today?",
+      "Hiya! �� Just so you know—I'm not Tevin, but I've got the tools and vibes to help you out!",
+      "Hello, friend! 💬 You're not talking to Tevin right now, but I'm here to keep things flowing!",
+      "Hey hey! Tevin's not on the line, but I've got your back—what do you need? 👊",
+      "Yo! This isn't Tevin, but I'm here in their place—locked in and ready for a great convo! 🚀"
     ]);
 
     this.addResponsePattern('farewell', [
       'bye', 'goodbye', 'see you', 'later', 'take care', 'good night'
     ], [
-      "See you later! 👋 Take care!",
-      "Goodbye! It was great chatting with you! 😊",
-      "Later! Don't forget to stay awesome! ✨",
-      "Take care! Looking forward to our next chat!",
-      "Goodbye! Have a wonderful day ahead! 🌟"
+      "See you later! 👋 Take care! And hey—if you ever need to reach Tevin directly, just hit up his private number!",
+      "Goodbye! It was great chatting with you! 😊 If you'd like to speak with Tevin personally, feel free to contact him on his private line!",
+      "Later! Don't forget to stay awesome! ✨ And if you wanna reach the one and only Tevin, you can catch him on his private number!",
+      "Take care! Looking forward to our next chat! And remember, if you ever need to talk to Tevin himself, his private number's the way to go!",
+      "Goodbye! Have a wonderful day ahead! 🌟 Oh—and if you wanna connect with Tevin directly, just reach out on his private number!"
     ]);
 
     this.addResponsePattern('thanks', [
@@ -129,7 +129,17 @@ class LocalAIModel {
       "I'm an AI designed to be a friendly chat companion! I'm here to help, entertain, and just be a good friend! 🤖💙",
       "AI is fascinating! I work by processing your messages and finding the best way to respond! 🧠✨",
       "Technology is amazing, isn't it? I'm here to chat and learn from our conversations! 💻",
-      "I'm a digital friend created to chat and help out! While I'm not human, I'm definitely real in the sense that I'm here to have genuine conversations with you! 🤖💙"
+      "I'm a digital friend created to chat and help out! While I'm not human, I'm definitely real in the sense that I'm here to have genuine conversations with you! ��💙"
+    ]);
+
+    // Contact info
+    this.addKnowledgeEntry('contact_info', [
+      'contact', 'phone', 'number', 'whatsapp', 'mobile', 'instagram', 'how can i reach', 'how do i contact', 'tevin number', 'tevin whatsapp', 'tevin instagram', 'reach tevin', 'get in touch with tevin', 'call tevin', 'text tevin', 'message tevin', 'owner number', 'owner contact', 'bot owner', 'admin number', 'admin contact', 'who owns you', 'who is your owner', 'who made you', 'who created you', 'who is tevin', 'tevin contact', 'tevin info', 'tevin details'
+    ], [
+      "Here's Tevin's contact info!\n\n📱 Mobile/WhatsApp: +254762005479\n📸 Instagram: itts_tevin",
+      "You can reach Tevin at:\n- WhatsApp: +254762005479\n- Instagram: itts_tevin",
+      "Tevin's contact details:\nWhatsApp: +254762005479\nInstagram: itts_tevin",
+      "If you want to get in touch with Tevin (my creator), here's how:\nWhatsApp: +254762005479\nInstagram: itts_tevin"
     ]);
 
     // Questions about the bot
