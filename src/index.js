@@ -67,6 +67,9 @@ const client = new Client({
 // Store QR code data globally
 global.currentQRCode = null;
 
+// Track unrecognized message streaks per user
+const unrecognizedStreaks = {};
+
 // Generate QR code for WhatsApp Web
 client.on('qr', async (qr) => {
   console.log('QR RECEIVED', qr);
@@ -157,9 +160,11 @@ async function handleMessage(message) {
   
   const userMessage = message.body.toLowerCase().trim();
   console.log(`📝 Processing message: "${userMessage}"`);
-  
+  const userId = message.from;
+
   // Simple test response first
   if (userMessage === 'test' || userMessage === 'ping') {
+    if (unrecognizedStreaks[userId]) unrecognizedStreaks[userId] = 0;
     console.log('🧪 Sending test response...');
     await message.reply('Pong! 🏓 Bot is working!');
     return;
@@ -170,6 +175,7 @@ async function handleMessage(message) {
   const isFirstMessage = !chat.lastMessage || chat.lastMessage.fromMe;
   
   if (isFirstMessage) {
+    if (unrecognizedStreaks[userId]) unrecognizedStreaks[userId] = 0;
     console.log('👋 Sending welcome message...');
     await sendWelcomeMessage(message);
     return;
@@ -180,63 +186,64 @@ async function handleMessage(message) {
     userMessage.includes(greeting)
   );
   
-  // Handle entertainment options
+  // Entertainment options
   if (userMessage.includes('joke') || userMessage.includes('tell me a joke')) {
+    if (unrecognizedStreaks[userId]) unrecognizedStreaks[userId] = 0;
     await sendJoke(message);
     return;
   }
-  
   if (userMessage.includes('word game') || userMessage.includes('play')) {
+    if (unrecognizedStreaks[userId]) unrecognizedStreaks[userId] = 0;
     await startWordGame(message);
     return;
   }
-  
   if (userMessage.includes('fun fact') || userMessage.includes('fact')) {
+    if (unrecognizedStreaks[userId]) unrecognizedStreaks[userId] = 0;
     await sendFunFact(message);
     return;
   }
-  
   if (userMessage.includes('story') || userMessage.includes('tell me a story')) {
+    if (unrecognizedStreaks[userId]) unrecognizedStreaks[userId] = 0;
     await sendStory(message);
     return;
   }
-  
   if (userMessage.includes('trivia') || userMessage.includes('quiz')) {
+    if (unrecognizedStreaks[userId]) unrecognizedStreaks[userId] = 0;
     await sendTrivia(message);
     return;
   }
-  
   if (userMessage.includes('creative') || userMessage.includes('idea') || userMessage.includes('inspiration')) {
+    if (unrecognizedStreaks[userId]) unrecognizedStreaks[userId] = 0;
     await sendCreativeIdeas(message);
     return;
   }
-  
   if (userMessage.includes('advice') || userMessage.includes('help me') || userMessage.includes('suggestion')) {
+    if (unrecognizedStreaks[userId]) unrecognizedStreaks[userId] = 0;
     await sendRandomAdvice(message);
     return;
   }
-  
   // Bot control commands
   if (userMessage.includes('switch to ai mode') || userMessage.includes('enable full ai')) {
+    if (unrecognizedStreaks[userId]) unrecognizedStreaks[userId] = 0;
     await message.reply('🤖 Switching to Full AI mode! I\'ll now try to respond to everything with my local AI first. Set FULL_AI_MODE=true in Railway to make this permanent!');
     return;
   }
-  
   if (userMessage.includes('switch to normal mode') || userMessage.includes('disable full ai')) {
+    if (unrecognizedStreaks[userId]) unrecognizedStreaks[userId] = 0;
     await message.reply('🎮 Switching to Normal mode! I\'ll use entertainment features first, then my local AI as backup. Set FULL_AI_MODE=false in Railway to make this permanent!');
     return;
   }
-  
   // AI-powered responses
   if (userMessage.includes('ai') || userMessage.includes('smart') || userMessage.includes('intelligent')) {
+    if (unrecognizedStreaks[userId]) unrecognizedStreaks[userId] = 0;
     await sendAIResponse(message);
     return;
   }
-  
   // Full AI mode: Try AI first for everything
   if (FULL_AI_MODE) {
     const aiResponse = await tryAIResponse(message);
     if (aiResponse) {
+      if (unrecognizedStreaks[userId]) unrecognizedStreaks[userId] = 0;
       await message.reply(aiResponse);
       return;
     }
@@ -244,14 +251,13 @@ async function handleMessage(message) {
     await sendDefaultResponse(message);
     return;
   }
-  
   // Regular mode: Try AI for unknown requests, then fallback
   const aiResponse = await tryAIResponse(message);
   if (aiResponse) {
+    if (unrecognizedStreaks[userId]) unrecognizedStreaks[userId] = 0;
     await message.reply(aiResponse);
     return;
   }
-  
   // Default response with options
   await sendDefaultResponse(message);
 }
@@ -390,8 +396,22 @@ async function sendAIResponse(message) {
 }
 
 async function sendDefaultResponse(message) {
-  const defaultText = `${BOT_CONFIG.fallbackMessage}\n\n${BOT_CONFIG.entertainmentOptions.join('\n')}`;
-  await message.reply(defaultText);
+  const userId = message.from;
+  if (!unrecognizedStreaks[userId]) unrecognizedStreaks[userId] = 0;
+  unrecognizedStreaks[userId] += 1;
+
+  if (unrecognizedStreaks[userId] < 3) {
+    const defaultText = `Sorry, I didn't quite get that. Could you rephrase it? Or try one of these:\n\n${BOT_CONFIG.entertainmentOptions.join('\n')}`;
+    await message.reply(defaultText);
+  } else {
+    // Reset streak after giving contact info
+    unrecognizedStreaks[userId] = 0;
+    await message.reply(
+      `It seems I'm having trouble understanding you. Maybe Tevin can help you better!\n\n` +
+      `📱 WhatsApp: +254762005479\n` +
+      `📸 Instagram: itts_tevin`
+    );
+  }
 }
 
 // Error handling
